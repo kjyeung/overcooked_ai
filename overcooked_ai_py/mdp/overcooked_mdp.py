@@ -172,6 +172,7 @@ class OvercookedState(object):
         if order_list is not None:
             assert all([o in OvercookedGridworld.ORDER_TYPES for o in order_list])
         self.order_list = order_list
+        self.timestep = 0 # I add: The current timestep of the state
 
     @property
     def player_positions(self):
@@ -308,7 +309,8 @@ class OvercookedState(object):
         return {
             "players": [p.to_dict() for p in self.players],
             "objects": [obj.to_dict() for obj in self.objects.values()],
-            "order_list": self.order_list
+            "order_list": self.order_list,
+            "timestep": self.timestep,
         }
 
     @staticmethod
@@ -667,7 +669,7 @@ class OvercookedGridworld(object):
         self.resolve_movement(new_state, joint_action)
 
         # Finally, environment effects
-        sparse_reward += self.step_environment_effects(new_state)
+        sparse_reward += self.step_environment_effects(new_state) ## realy important
 
         # Additional dense reward logic
         # shaped_reward += self.calculate_distance_based_shaped_reward(state, new_state)
@@ -809,6 +811,7 @@ class OvercookedGridworld(object):
         return any(pos0 == pos1 for pos0, pos1 in itertools.combinations(joint_position, 2))
             
     def step_environment_effects(self, state):
+        state.timestep += 1
         reward = 0
         for obj in state.objects.values():
             if obj.name == 'soup':
@@ -818,7 +821,7 @@ class OvercookedGridworld(object):
                 if self.terrain_mtx[y][x] == 'P' and \
                     num_items == self.num_items_for_soup and \
                     cook_time < self.soup_cooking_time:
-                        obj.state = soup_type, num_items, cook_time + 1
+                        obj.state = soup_type, num_items, cook_time + 1 ## here add the cook_time
         return reward
 
     def _handle_collisions(self, old_positions, new_positions):
