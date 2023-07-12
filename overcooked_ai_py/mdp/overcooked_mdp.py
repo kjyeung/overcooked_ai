@@ -931,6 +931,61 @@ class OvercookedGridworld(object):
     # TERMINAL GRAPHICS #
     #####################
 
+    # def state_string(self, state):
+    #     """String representation of the current state"""
+    #     players_dict = {player.position: player for player in state.players}
+
+    #     grid_string = ""
+    #     for y, terrain_row in enumerate(self.terrain_mtx):
+    #         for x, element in enumerate(terrain_row):
+    #             if (x, y) in players_dict.keys():
+    #                 player = players_dict[(x, y)]
+    #                 orientation = player.orientation
+    #                 assert orientation in Direction.ALL_DIRECTIONS
+
+    #                 grid_string += Action.ACTION_TO_CHAR[orientation]
+    #                 player_object = player.held_object
+    #                 if player_object:
+    #                     grid_string += player_object.name[:1]
+    #                 else:
+    #                     player_idx_lst = [i for i, p in enumerate(state.players) if p.position == player.position]
+    #                     assert len(player_idx_lst) == 1
+    #                     grid_string += str(player_idx_lst[0])
+    #             else:
+    #                 if element == "X" and state.has_object((x, y)):
+    #                     state_obj = state.get_object((x, y))
+    #                     grid_string = grid_string + element + state_obj.name[:1]
+
+    #                 elif element == "P" and state.has_object((x, y)):
+    #                     soup_obj = state.get_object((x, y))
+    #                     soup_type, num_items, cook_time = soup_obj.state
+    #                     if soup_type == "onion":
+    #                         grid_string += "ø"
+    #                     elif soup_type == "tomato":
+    #                         grid_string += "†"
+    #                     else:
+    #                         raise ValueError()
+
+    #                     if num_items == self.num_items_for_soup:
+    #                         grid_string += str(cook_time)
+                        
+    #                     # NOTE: do not currently have terminal graphics 
+    #                     # support for cooking times greater than 3.
+    #                     elif num_items == 2:
+    #                         grid_string += "="
+    #                     else:
+    #                         grid_string += "-"
+    #                 else:
+    #                     grid_string += element + " "
+
+    #         grid_string += "\n"
+        
+    #     if state.order_list is not None:
+    #         grid_string += "Current orders: {}/{} are any's\n".format(
+    #             len(state.order_list), len([order == "any" for order in state.order_list])
+    #         )
+    #     return grid_string
+    
     def state_string(self, state):
         """String representation of the current state"""
         players_dict = {player.position: player for player in state.players}
@@ -938,47 +993,52 @@ class OvercookedGridworld(object):
         grid_string = ""
         for y, terrain_row in enumerate(self.terrain_mtx):
             for x, element in enumerate(terrain_row):
+                grid_string_add = ""
                 if (x, y) in players_dict.keys():
                     player = players_dict[(x, y)]
                     orientation = player.orientation
                     assert orientation in Direction.ALL_DIRECTIONS
 
-                    grid_string += Action.ACTION_TO_CHAR[orientation]
+                    grid_string_add += Action.ACTION_TO_CHAR[orientation]
                     player_object = player.held_object
                     if player_object:
-                        grid_string += player_object.name[:1]
+                        grid_string_add += player_object.name[:1]
                     else:
                         player_idx_lst = [i for i, p in enumerate(state.players) if p.position == player.position]
                         assert len(player_idx_lst) == 1
-                        grid_string += str(player_idx_lst[0])
+                        grid_string_add += str(player_idx_lst[0])
                 else:
                     if element == "X" and state.has_object((x, y)):
                         state_obj = state.get_object((x, y))
-                        grid_string = grid_string + element + state_obj.name[:1]
+                        grid_string_add = grid_string_add + element + state_obj.name[:1]
 
                     elif element == "P" and state.has_object((x, y)):
                         soup_obj = state.get_object((x, y))
                         soup_type, num_items, cook_time = soup_obj.state
                         if soup_type == "onion":
-                            grid_string += "ø"
+                            grid_string_add += "ø"
                         elif soup_type == "tomato":
-                            grid_string += "†"
+                            grid_string_add += "†"
                         else:
                             raise ValueError()
 
                         if num_items == self.num_items_for_soup:
-                            grid_string += str(cook_time)
+                            grid_string_add += str(cook_time)
                         
                         # NOTE: do not currently have terminal graphics 
                         # support for cooking times greater than 3.
                         elif num_items == 2:
-                            grid_string += "="
+                            grid_string_add += "="
                         else:
-                            grid_string += "-"
+                            grid_string_add += "-"
                     else:
-                        grid_string += element + " "
+                        grid_string_add += element + " "
 
-            grid_string += "\n"
+                grid_string += grid_string_add
+                grid_string += "".join([" "] * (7 - len(grid_string_add)))
+                grid_string += " "
+
+            grid_string += "\n\n"
         
         if state.order_list is not None:
             grid_string += "Current orders: {}/{} are any's\n".format(
