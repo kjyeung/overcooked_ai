@@ -155,13 +155,14 @@ class PlayerState(object):
 
 class OvercookedState(object):
     """A state in OvercookedGridworld."""
-    def __init__(self, players, objects, order_list):
+    def __init__(self, players, objects, order_list, timestep=0):
         """
         players: List of PlayerStates (order corresponds to player indices).
         objects: Dictionary mapping positions (x, y) to ObjectStates. 
                  NOTE: Does NOT include objects held by players (they are in 
                  the PlayerState objects).
         order_list: Current orders to be delivered
+        timestep (int):  The current timestep of the state
 
         NOTE: Does not contain time left, which is handled from the environment side.
         """
@@ -172,7 +173,7 @@ class OvercookedState(object):
         if order_list is not None:
             assert all([o in OvercookedGridworld.ORDER_TYPES for o in order_list])
         self.order_list = order_list
-        self.timestep = 0 # I add: The current timestep of the state
+        self.timestep = timestep # I add: The current timestep of the state
 
     @property
     def player_positions(self):
@@ -284,7 +285,8 @@ class OvercookedState(object):
         return OvercookedState(
             [player.deepcopy() for player in self.players],
             {pos:obj.deepcopy() for pos, obj in self.objects.items()}, 
-            None if self.order_list is None else list(self.order_list))
+            None if self.order_list is None else list(self.order_list),
+            timestep=self.timestep)
 
     def __eq__(self, other):
         order_list_equal = type(self.order_list) == type(other.order_list) and \
@@ -1001,12 +1003,17 @@ class OvercookedGridworld(object):
 
                     grid_string_add += Action.ACTION_TO_CHAR[orientation]
                     player_object = player.held_object
+                    # if player_object:
+                    #     grid_string_add += player_object.name[:1]
+                    # else:
+                    #     player_idx_lst = [i for i, p in enumerate(state.players) if p.position == player.position]
+                    #     assert len(player_idx_lst) == 1
+                    #     grid_string_add += str(player_idx_lst[0])
+                    player_idx_lst = [i for i, p in enumerate(state.players) if p.position == player.position]
+                    assert len(player_idx_lst) == 1
+                    grid_string_add += str(player_idx_lst[0])
                     if player_object:
                         grid_string_add += player_object.name[:1]
-                    else:
-                        player_idx_lst = [i for i, p in enumerate(state.players) if p.position == player.position]
-                        assert len(player_idx_lst) == 1
-                        grid_string_add += str(player_idx_lst[0])
                 else:
                     if element == "X" and state.has_object((x, y)):
                         state_obj = state.get_object((x, y))
