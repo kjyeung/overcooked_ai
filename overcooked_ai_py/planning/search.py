@@ -1,6 +1,124 @@
 import heapq, time
 import numpy as np
 import scipy.sparse
+from overcooked_ai_py.mdp.actions import Action
+
+class Node:
+    """
+        A node class for A* Pathfinding
+        parent is parent of the current Node
+        position is current position of the Node in the maze
+        g is cost from start to current Node
+        h is heuristic based estimated cost for current Node to end Node
+        f is total cost of present node i.e. :  f = g + h
+    """
+
+    def __init__(self, parent=None, position=None):
+        self.parent = parent
+        self.position = position
+
+        self.g = 0
+        self.h = 0
+        self.f = 0
+    def __eq__(self, other):
+        return self.position == other.position
+    
+def find_path(start_pos_and_or, other_pos_and_or, goal, terrain_mtx):  
+    
+    start_node = Node(None, start_pos_and_or)  
+    end_node   = Node(None, goal)
+
+    yet_to_visit_list = [] 
+    visited_list = [] 
+
+    move = [(-1, 0),    # left 
+            (0, -1),    # up 
+            (1, 0),     # right 
+            (0, 1)]     # down 
+
+    n_rows = terrain_mtx['height']  
+    n_cols = terrain_mtx['width']    
+    mtx = terrain_mtx['matrix'] 
+
+    mtx[other_pos_and_or[0][1]][other_pos_and_or[0][0]] = 'B' 
+
+    
+
+    yet_to_visit_list.append(start_node)   
+
+    # let's just do bfs for now. 
+    while len(yet_to_visit_list) > 0:  
+        current_node = yet_to_visit_list[0]    
+        yet_to_visit_list.pop(0)  
+        visited_list.append(current_node)   
+
+        # 已经从一个方向到达，无需继续扩展了 
+        if current_node.position[0] == goal[0]: 
+            continue 
+        
+        for new_position in move:  
+            node_position = (
+                current_node.position[0][0] + new_position[0], 
+                current_node.position[0][1] + new_position[1]
+            ) 
+
+            # position out of bound 
+            if (node_position[0] > (n_cols - 1) or 
+                node_position[0] < 0 or 
+                node_position[1] > (n_rows - 1) or 
+                node_position[1] < 0): 
+                continue 
+            
+            if mtx[node_position[1]][node_position[0]] != ' ':
+                continue 
+                
+            
+            new_node = Node(current_node, (node_position, new_position))  
+
+            if (new_node in visited_list) or (new_node in yet_to_visit_list): 
+                continue  
+
+            new_node.f = current_node.f + 1 
+            yet_to_visit_list.append(new_node)  
+    # visited     
+    last_node = None 
+    for i in visited_list:  
+        if i.position[0] == goal[0]:   
+            if last_node is None: 
+                if i.position[1] == goal[1]: 
+                    last_node = i  
+                else: 
+                    last_node = Node(i, (goal[0], goal[1])) 
+                    last_node.f = i.f + 1    
+            else: 
+                if i.position[1] == goal[1] and i.f < last_node.f:
+                    last_node = i 
+                elif i.f + 1 < last_node.f: 
+                    last_node = Node(i, (goal[0], goal[1])) 
+                    last_node.f = i.f + 1 
+
+    # no available plans. 
+    if last_node is None: 
+        return None, np.Inf 
+    else: 
+        print(f'planned last_node = {last_node.position}')
+        previous_node = last_node        
+        while (previous_node.parent is not None) and (previous_node.parent != start_node): 
+            previous_node = previous_node.parent     
+        # already there. 
+        if previous_node == start_node:  
+            return Action.INTERACT, 1
+        else: 
+            # did not move, changed direction 
+            if previous_node.position[0] == start_node.position[0]: 
+                return previous_node.position[1], last_node.f + 1 
+            else: 
+                # moved  
+                return (
+                    previous_node.position[0][0] - start_node.position[0][0], 
+                    previous_node.position[0][1] - start_node.position[0][1]
+                ), last_node.f + 1 
+       
 
 class SearchTree(object):
     """

@@ -1,11 +1,19 @@
+import sys 
 import itertools
 import numpy as np
-
+import copy 
 from overcooked_ai_py.mdp.actions import Action, Direction
 from overcooked_ai_py.planning.planners import Heuristic
-from overcooked_ai_py.planning.search import SearchTree
+from overcooked_ai_py.planning.search import SearchTree, find_path
+from overcooked_ai_py.planning.search import find_path
+
+import numpy as np 
+import sys 
+import tiktoken
+from overcooked_ai_py.mdp.actions import Action, Direction
 
 
+    
 class Agent(object):
 
     def action(self, state):
@@ -282,10 +290,11 @@ class GreedyHumanModel(Agent):
     in which an individual agent cannot complete the task on their own.
     """
 
-    def __init__(self, mlp, hl_boltzmann_rational=False, ll_boltzmann_rational=False, hl_temp=1, ll_temp=1):
+    def __init__(self, mlp, hl_boltzmann_rational=False, ll_boltzmann_rational=False, hl_temp=1, ll_temp=1, controller_mode = 'new'):
         self.mlp = mlp
         self.mdp = self.mlp.mdp
 
+        self.controller_mode = controller_mode  
         # Bool for perfect rationality vs Boltzmann rationality for high level and low level action selection
         self.hl_boltzmann_rational = hl_boltzmann_rational # For choices among high level goals of same type
         self.ll_boltzmann_rational = ll_boltzmann_rational # For choices about low level motion
@@ -315,7 +324,7 @@ class GreedyHumanModel(Agent):
         # level action we want to perform, select the one with lowest cost
         start_pos_and_or = state.players_pos_and_or[self.agent_index]
 
-        chosen_goal, chosen_goal_action = self.choose_motion_goal(start_pos_and_or, possible_motion_goals)
+        chosen_goal, chosen_goal_action = self.choose_motion_goal(start_pos_and_or, possible_motion_goals, state)
 
         if not self.ll_boltzmann_rational or chosen_goal[0] == start_pos_and_or[0]:
             chosen_action = chosen_goal_action
@@ -344,7 +353,7 @@ class GreedyHumanModel(Agent):
         self.prev_state = state
         return chosen_action
 
-    def choose_motion_goal(self, start_pos_and_or, motion_goals):
+    def choose_motion_goal(self, start_pos_and_or, motion_goals, state = None):
         """Returns chosen motion goal (either boltzmann rationally or rationally), and corresponding action"""
         if self.hl_boltzmann_rational:
             possible_plans = [self.mlp.mp.get_plan(start_pos_and_or, goal) for goal in motion_goals]
@@ -353,8 +362,22 @@ class GreedyHumanModel(Agent):
             chosen_goal = motion_goals[goal_idx]
             chosen_goal_action = possible_plans[goal_idx][0][0]
         else:
-            chosen_goal, chosen_goal_action = self.get_lowest_cost_action_and_goal(start_pos_and_or, motion_goals)
-        
+            # MARKING: 原先代码：调用的是 get_lowest_cost_action_and_goal
+            # 改变后变成 new 了 
+            if self.controller_mode == 'new':  
+                (
+                    chosen_goal,
+                    chosen_goal_action,
+                ) = self.get_lowest_cost_action_and_goal_new(
+                    start_pos_and_or, motion_goals, state
+                )
+            else: 
+                (
+                    chosen_goal,
+                    chosen_goal_action,
+                ) = self.get_lowest_cost_action_and_goal(
+                    start_pos_and_or, motion_goals, state
+                )
         return chosen_goal, chosen_goal_action
 
     def get_boltzmann_rational_action_idx(self, costs, temperature):
@@ -377,7 +400,56 @@ class GreedyHumanModel(Agent):
                 min_cost = plan_cost
                 best_goal = goal
         return best_goal, best_action
+    
+    def get_lowest_cost_action_and_goal_new(self, start_pos_and_or, motion_goals, state): 
+        """
+            Chooses motion goal that has the lowest cost action plan.
+            Returns the motion goal itself and the first action on the plan.
+        """   
+        min_cost = np.Inf
+        best_action, best_goal = None, None
+        for goal in motion_goals:   
+            """
+                print(start_pos_and_or, goal) 
+                ((4, 3), (0, -1)) ((3, 3), (0, 1))
+                sys.exit(0) 
+            """
+            # MARKING: 通过 self.mlam.motion_planner.get_plan 计算出这个 plan 的 cost 
+            action_plan, plan_cost = self.real_time_planner(
+                start_pos_and_or, goal, state
+            )     
+            """
+            print(action_plan)  = [(-1, 0), (0, 1), 'interact']
+            sys.exit(0) 
+            """
+            if plan_cost < min_cost:
+                best_action = action_plan
+                min_cost = plan_cost
+                best_goal = goal   
+        #print(best_goal, best_action) 
+        #sys.exit(0) 
 
+        # 此时路被堵住了, 直接调用先前预处理好的 default 方案 
+        if best_action is None: 
+            print('\n\n\nBlocking Happend, executing default path\n\n\n')       
+            if np.random.rand() < 0.5: 
+                return motion_goals[0], Action.STAY
+            else: 
+                return self.get_lowest_cost_action_and_goal(start_pos_and_or, motion_goals)
+
+        return best_goal, best_action
+
+    def real_time_planner(self, start_pos_and_or, goal, state):   
+        terrain_matrix = {
+            'matrix': copy.deepcopy(self.mlp.mdp.terrain_mtx), 
+            'height': len(self.mlp.mdp.terrain_mtx), 
+            'width' : len(self.mlp.mdp.terrain_mtx[0]) 
+        }
+        other_pos_and_or = state.players_pos_and_or[1 - self.agent_index]
+        action_plan, plan_cost = find_path(start_pos_and_or, other_pos_and_or, goal, terrain_matrix) 
+
+        return action_plan, plan_cost
+    
     def boltzmann_rational_ll_action(self, start_pos_and_or, goal):
         future_costs = []
         for action in Action.ALL_ACTIONS:
