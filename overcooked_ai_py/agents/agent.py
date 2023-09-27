@@ -9,7 +9,6 @@ from overcooked_ai_py.planning.search import find_path
 
 import numpy as np 
 import sys 
-import tiktoken
 from overcooked_ai_py.mdp.actions import Action, Direction
 
 
